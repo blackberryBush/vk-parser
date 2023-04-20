@@ -3,7 +3,7 @@ from datetime import datetime
 
 import vk
 
-from comment import Comment, add_post_comments, get_post_comments
+from comment import Comment, add_post_comments, get_post_comments, get_post_comments_by_date
 from post import Post, get_posts_by_date
 
 
@@ -29,7 +29,7 @@ def write_to_csv(data, filename):
                 # calculate time interval and frequency if there is a previous item for the user pair
                 if user_pair in user_pairs:
                     writer.writerow(
-                        [created_at.strftime('%Y-%m-%d %H:%M:%S'), user_pair[0], user_pair[1],  item.date])
+                        [created_at.strftime('%Y-%m-%d %H:%M:%S'), user_pair[0], user_pair[1], item.date])
 
                 # update count and previous created_at for the user pair
                 user_pairs[user_pair] = (created_at, user_pairs.get(user_pair, (None, 0))[1] + 1)
@@ -40,6 +40,8 @@ if __name__ == "__main__":
     vk_api = vk.API(access_token=token)
     gid = get_group_id("lentach", vk_api)
     data1 = get_posts_by_date(vk_api, gid, datetime(2023, 3, 18, 12, 30, 0), datetime(2023, 3, 19, 12, 30, 0))
-    data2 = [comment for post in data1 for comment in get_post_comments(vk_api, post)]
+    data2 = [comment for post in data1 for comment in
+             get_post_comments_by_date(vk_api, post, datetime(2023, 3, 18, 12, 30, 0),
+                                       datetime(2023, 3, 19, 12, 30, 0))]
     data1 = add_post_comments(data1, data2)
     write_to_csv(data1, "data.csv")
