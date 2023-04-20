@@ -2,37 +2,31 @@ import time
 
 
 class Comment:
-    def __init__(self, d: dict):
-        self.content_id = d.get("id", "-1")
+    def __init__(self, data):
+        self.content_id = data.get("id", "-1")
         self.content_type = "comment"
-        self.date = d.get("date", -1)
-        self.owner_id = d.get("reply_to_user", -1)
-        if self.owner_id == -1:
-            self.owner_id = d.get("owner_id", -1)
-        self.owner_content_id = d.get("reply_to_comment", -1)
-        if self.owner_content_id == -1:
-            self.owner_content_id = d.get("parents_stack", -1)
-            if self.owner_content_id != -1:
-                self.owner_content_id = d.get(0, -1)
-        if self.owner_content_id == -1:
-            self.owner_content_id = d.get("post_id", -1)
-        self.user_id = d.get("from_id", -1)
-        self.likes = d.get("likes", -1)
-        if isinstance(self.likes, dict):
-            self.likes = self.likes.get("count", 0)
-        self.comments = d.get("thread", -1)
-        if self.comments != -1:
-            self.comments = self.comments.get("count", 0)
+        self.date = data.get("date", -1)
+        self.owner_id = data.get("reply_to_user", -1) or data.get("owner_id", -1)
+        self.owner_content_id = (
+                data.get("reply_to_comment", -1)
+                or data.get("parents_stack", [-1])[0]
+                or data.get("post_id", -1)
+        )
+        self.user_id = data.get("from_id", -1)
+        likes = data.get("likes", -1)
+        self.likes = likes.get("count") if isinstance(likes, dict) else likes
+        thread = data.get("thread", -1)
+        self.comments = thread.get("count") if thread != -1 else 0
 
     def __str__(self):
-        return f'{self.content_type}: {self.content_id} / time: {self.date} / ' \
-               f'owner: {self.owner_id} / owner_content_id: {self.owner_content_id} / user: {self.user_id} / ' \
-               f'likes: {self.likes} / comments: {self.comments}'
+        return (
+            f"{self.content_type}: {self.content_id} / time: {self.date} / "
+            f"owner: {self.owner_id} / owner_content_id: {self.owner_content_id} / user: {self.user_id} / "
+            f"likes: {self.likes} / comments: {self.comments}"
+        )
 
     def __eq__(self, other):
-        if self.content_id == other:
-            return True
-        return False
+        return self.content_id == other
 
 
 def get_threads(vk_api, post, data, last_check=0):
@@ -69,10 +63,7 @@ def get_raw_post_comments(vk_api, owner_id, post_id):
 
 
 def get_classed_post_comments(raw_data):
-    data = []
-    for i in raw_data:
-        data.append(Comment(i))
-    return data
+    return [Comment(item) for item in raw_data]
 
 
 def get_raw_comment_replies(vk_api, owner_id, comment_id):
@@ -95,7 +86,7 @@ def add_post_comments(data: list, data_comments: list) -> list:
     for i in data_comments:
         try:
             ind = data.index(i.owner_content_id)
-        except Exception:
+        except ValueError:
             ind = -1
         data.insert(ind + 1, i)
     return data
