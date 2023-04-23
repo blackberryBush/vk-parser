@@ -1,5 +1,4 @@
 import time
-import datetime
 
 
 class Post:
@@ -15,7 +14,8 @@ class Post:
         self.comments = d.get("comments", {}).get("count", 0)
 
     def __str__(self):
-        return f"{self.content_type}: {self.content_id} / time: {self.date} / owner: {self.owner_id} / user: {self.user_id} / likes: {self.likes} / reposts: {self.reposts} / comments: {self.comments}"
+        return f"{self.content_type}: {self.content_id} / time: {self.date} / owner: {self.owner_id} / " \
+               f"user: {self.user_id} / likes: {self.likes} / reposts: {self.reposts} / comments: {self.comments}"
 
     def __eq__(self, other):
         return self.content_id == other
@@ -27,19 +27,23 @@ def get_raw_posts_by_date(vk_api, owner_id, date1, date2):
 
     time.sleep(0.334)
     first = vk_api.wall.get(owner_id=owner_id, v=5.131)
-    data = first["items"]
+    data = list()
     count = first["count"] // 100
-    if count > 1:
+    if count < 1:
         count = 1
-    for i in range(1, count + 1):
+    for i in range(count):
         time.sleep(0.334)
-        posts = vk_api.wall.get(owner_id=owner_id, v=5.131, offset=i * 100)["items"]
+        need_break = False
+        posts = vk_api.wall.get(owner_id=owner_id, v=5.131, count=100, offset=i * 100)["items"]
         for post in posts:
             if date1_unix <= post["date"] <= date2_unix:
                 data.append(post)
             elif post["date"] < date1_unix:
+                need_break = True
                 break
-        print(f"Идёт парсинг {owner_id}: извлечено {i * 100} записей")
+        if need_break:
+            break
+        print(f"Идёт парсинг постов {owner_id}: извлечено {len(posts)} записей")
     return data
 
 

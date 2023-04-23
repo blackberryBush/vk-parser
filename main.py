@@ -1,9 +1,10 @@
 import csv
-from datetime import datetime
+import datetime
 
+import pytz as pytz
 import vk
 
-from comment import Comment, add_post_comments, get_post_comments, get_post_comments_by_date
+from comment import Comment, add_post_comments, get_post_comments_by_date
 from post import Post, get_posts_by_date
 
 
@@ -23,7 +24,7 @@ def write_to_csv(data, filename):
         # loop through each item in the data list
         for item in data:
             if isinstance(item, Comment) or isinstance(item, Post):
-                created_at = datetime.utcfromtimestamp(item.date)
+                created_at = datetime.datetime.utcfromtimestamp(item.date)
                 user_pair = tuple(sorted([item.user_id, item.owner_id]))
 
                 # calculate time interval and frequency if there is a previous item for the user pair
@@ -35,13 +36,51 @@ def write_to_csv(data, filename):
                 user_pairs[user_pair] = (created_at, user_pairs.get(user_pair, (None, 0))[1] + 1)
 
 
+def distribute_lines(filename, time_start, time_slot_length):
+    date1_unix = int(time_start.timestamp())
+
+    output_file = filename[:-4] + "_new.csv"  # create a new filename for the output file
+
+    with open(filename, 'r') as input_file, open(output_file, 'w', newline='') as output_file:
+        reader = csv.reader(input_file, delimiter=';')
+        writer = csv.writer(output_file, delimiter=';')
+        header = next(reader)
+        writer.writerow(header)
+
+        unique_rows = set()  # to store unique rows based on u1, u2, and time_interval
+
+        # Loop through each row of the input file
+        for row in reader:
+            u1 = row[1]
+            u2 = row[2]
+            time_interval = int(row[3])
+
+            current_interval = date1_unix
+            while time_interval >= current_interval:
+                current_interval += time_slot_length
+            created_at = datetime.datetime.utcfromtimestamp(current_interval)
+
+            if (u1, u2, time_interval) not in unique_rows:
+                unique_rows.add((u1, u2, time_interval))
+                writer.writerow((created_at, u1, u2, time_interval))  # write the row to the output file
+
+    return output_file
+
+
 if __name__ == "__main__":
-    token = "0c8512290c8512290c851229580f9745a900c850c8512296f4aca4683b7880e4d7a40d3"  # Сервисный ключ доступа
-    vk_api = vk.API(access_token=token)
-    gid = get_group_id("lentach", vk_api)
-    data1 = get_posts_by_date(vk_api, gid, datetime(2023, 3, 18, 12, 30, 0), datetime(2023, 3, 19, 12, 30, 0))
-    data2 = [comment for post in data1 for comment in
-             get_post_comments_by_date(vk_api, post, datetime(2023, 3, 18, 12, 30, 0),
-                                       datetime(2023, 3, 19, 12, 30, 0))]
-    data1 = add_post_comments(data1, data2)
-    write_to_csv(data1, "data.csv")
+    access_token = "0c8512290c8512290c851229580f9745a900c850c8512296f4aca4683b7880e4d7a40d3"  # Service access key
+    vk_api = vk.API(access_token=access_token)
+    group_id = get_group_id("lentach", vk_api)
+    posts_data = get_posts_by_date(vk_api, group_id,
+                                   datetime.datetime(2023, 3, 18, 12, 29, 0, tzinfo=pytz.timezone('Europe/London')),
+                                   datetime.datetime(2023, 3, 19, 12, 29, 0, tzinfo=pytz.timezone('Europe/London')))
+    comments_data = [comment for post in posts_data for comment in
+                     get_post_comments_by_date(vk_api, post,
+                                               datetime.datetime(2023, 3, 18, 12, 29, 0,
+                                                                 tzinfo=pytz.timezone('Europe/London')),
+                                               datetime.datetime(2023, 3, 19, 12, 29, 0,
+                                                                 tzinfo=pytz.timezone('Europe/London')))]
+    posts_data = add_post_comments(posts_data, comments_data)
+    sorted_data = sorted(posts_data, key=lambda x: x.date)
+    write_to_csv(sorted_data, "data.csv")
+    distribute_lines("data.csv", datetime.datetime(2023, 3, 18, 12, 29, 0, tzinfo=pytz.timezone('Europe/London')), 3600)
