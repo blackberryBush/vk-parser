@@ -1,5 +1,6 @@
 import csv
 import datetime
+from collections import Counter
 
 import pytz as pytz
 import vk
@@ -45,12 +46,15 @@ def distribute_lines(filename, time_start, time_slot_length):
         reader = csv.reader(input_file, delimiter=';')
         writer = csv.writer(output_file, delimiter=';')
         header = next(reader)
+        header.append('frequency')  # add the new column header
         writer.writerow(header)
 
         unique_rows = set()  # to store unique rows based on u1, u2, and time_interval
+        no_unique_rows = dict()
 
         # Loop through each row of the input file
         for row in reader:
+
             u1 = row[1]
             u2 = row[2]
             time_interval = int(row[3])
@@ -60,9 +64,15 @@ def distribute_lines(filename, time_start, time_slot_length):
                 current_interval += time_slot_length
             created_at = datetime.datetime.utcfromtimestamp(current_interval)
 
-            if (u1, u2, time_interval) not in unique_rows:
-                unique_rows.add((u1, u2, time_interval))
-                writer.writerow((created_at, u1, u2, time_interval))  # write the row to the output file
+            if (u1, u2, current_interval) not in unique_rows:
+                unique_rows.add((u1, u2, current_interval))
+                no_unique_rows[(u1, u2, current_interval)] = 1
+            else:
+                no_unique_rows[(u1, u2, current_interval)] += 1
+        for u1, u2, current_interval in unique_rows:
+            if u1 != u2:
+                writer.writerow([created_at.strftime('%Y-%m-%d %H:%M:%S'), u1, u2, current_interval,
+                                 no_unique_rows[(u1, u2, current_interval)]])
 
     return output_file
 
@@ -73,12 +83,12 @@ if __name__ == "__main__":
     group_id = get_group_id("lentach", vk_api)
     posts_data = get_posts_by_date(vk_api, group_id,
                                    datetime.datetime(2023, 3, 18, 12, 29, 0, tzinfo=pytz.timezone('Europe/London')),
-                                   datetime.datetime(2023, 3, 19, 12, 29, 0, tzinfo=pytz.timezone('Europe/London')))
+                                   datetime.datetime(2023, 3, 21, 12, 29, 0, tzinfo=pytz.timezone('Europe/London')))
     comments_data = [comment for post in posts_data for comment in
                      get_post_comments_by_date(vk_api, post,
                                                datetime.datetime(2023, 3, 18, 12, 29, 0,
                                                                  tzinfo=pytz.timezone('Europe/London')),
-                                               datetime.datetime(2023, 3, 19, 12, 29, 0,
+                                               datetime.datetime(2023, 3, 21, 12, 29, 0,
                                                                  tzinfo=pytz.timezone('Europe/London')))]
     posts_data = add_post_comments(posts_data, comments_data)
     sorted_data = sorted(posts_data, key=lambda x: x.date)
