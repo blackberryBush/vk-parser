@@ -55,7 +55,7 @@ def get_raw_post_comments_by_date(vk_api, owner_id, post_id, date1, date2):
     date2_unix = int(date2.timestamp())
 
     time.sleep(0.334)
-    first = vk_api.wall.getComments(owner_id=owner_id, post_id=post_id, need_likes=1, v=5.131)
+    first = vk_api.wall.getComments(owner_id=owner_id, post_id=post_id, count=100, need_likes=1, v=5.131)
     data = list()
     count = first["count"] // 100
     if count < 1:
@@ -64,7 +64,7 @@ def get_raw_post_comments_by_date(vk_api, owner_id, post_id, date1, date2):
     for i in range(count):
         time.sleep(0.334)
         need_break = False
-        comments = vk_api.wall.getComments(v="5.131", owner_id=owner_id, post_id=post_id, need_likes=1,
+        comments = vk_api.wall.getComments(v="5.131", owner_id=owner_id, post_id=post_id, count=100, need_likes=1,
                                            offset=i * 100)["items"]
         for comment in comments:
             if date1_unix <= comment["date"] <= date2_unix:
@@ -87,16 +87,16 @@ def get_raw_comment_replies_by_date(vk_api, owner_id, comment_id, date1, date2):
     date2_unix = int(date2.timestamp())
 
     time.sleep(0.334)
-    first = vk_api.wall.getComments(owner_id=owner_id, comment_id=comment_id, need_likes=1, v=5.131)
+    first = vk_api.wall.getComments(owner_id=owner_id, comment_id=comment_id, count=100, need_likes=1, v=5.131)
     data = list()
     count = first["count"] // 100
     if count < 1:
         count = 1
     print(f"Идёт парсинг комментов {owner_id}, коммент {comment_id}")
     for i in range(count):
-        time.sleep(0.35)
+        time.sleep(0.334)
         need_break = False
-        comments = vk_api.wall.getComments(owner_id=owner_id, comment_id=comment_id, need_likes=1,
+        comments = vk_api.wall.getComments(owner_id=owner_id, comment_id=comment_id, count=100, need_likes=1,
                                            offset=i * 100, v=5.131)["items"]
         for comment in comments:
             if date1_unix <= comment["date"] <= date2_unix:
