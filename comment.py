@@ -3,31 +3,31 @@ import time
 
 class Comment:
     def __init__(self, data):
+        self.raw_data = data
         self.content_id = data.get("id", "-1")
         self.content_type = "comment"
         self.date = data.get("date", -1)
+        if self.date != -1:
+            self.date += 3600 * 3
         self.owner_id = data.get("reply_to_user", -1)
         if self.owner_id == -1:
             self.owner_id = data.get("owner_id", -1)
-        self.owner_content_id = (
-                data.get("reply_to_comment", -1)
-                or data.get("parents_stack", [-1])[0]
-                or data.get("post_id", -1)
-        )
+        self.owner_content_id = data.get("reply_to_comment", -1)
+        if self.owner_content_id == -1:
+            try:
+                self.owner_content_id = data.get("parents_stack", [-1])[0]
+            except IndexError:
+                self.owner_content_id = -1
+        if self.owner_content_id == -1:
+            self.owner_content_id = data.get("post_id", -1)
         self.user_id = data.get("from_id", -1)
-        if self.owner_id == -1 or self.user_id == -1 or self.user_id == 0:
-            print(data)
         likes = data.get("likes", -1)
         self.likes = likes.get("count") if isinstance(likes, dict) else likes
         thread = data.get("thread", -1)
         self.comments = thread.get("count") if thread != -1 else 0
 
     def __str__(self):
-        return (
-            f"{self.content_type}: {self.content_id} / time: {self.date} / "
-            f"owner: {self.owner_id} / owner_content_id: {self.owner_content_id} / user: {self.user_id} / "
-            f"likes: {self.likes} / comments: {self.comments}"
-        )
+        return str(self.raw_data)
 
     def __eq__(self, other):
         return self.content_id == other

@@ -3,9 +3,12 @@ import time
 
 class Post:
     def __init__(self, d):
+        self.raw_data = d
         self.content_id = d.get("id", "-1")
         self.content_type = d.get("post_type", "post")
         self.date = d.get("date", -1)
+        if self.date != -1:
+            self.date += 3600 * 3
         self.owner_id = d.get("owner_id", -1)
         self.owner_content_id = -1
         self.user_id = d.get("from_id", -1)
@@ -14,8 +17,7 @@ class Post:
         self.comments = d.get("comments", {}).get("count", 0)
 
     def __str__(self):
-        return f"{self.content_type}: {self.content_id} / time: {self.date} / owner: {self.owner_id} / " \
-               f"user: {self.user_id} / likes: {self.likes} / reposts: {self.reposts} / comments: {self.comments}"
+        return str(self.raw_data)
 
     def __eq__(self, other):
         return self.content_id == other

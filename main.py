@@ -1,5 +1,6 @@
 import csv
 import datetime
+import time
 
 import pytz as pytz
 import vk
@@ -8,35 +9,34 @@ from comment import Comment, add_post_comments, get_post_comments_by_date
 from post import Post, get_posts_by_date
 
 
+def get_groups_or_users_id(links, api_vk):
+    ids = []
+    print("Получение id пользователей/групп...")
+    for link in links:
+        time.sleep(0.334)
+        ids.append(get_group_or_user_id(link, api_vk))
+    return ids
+
+
 def get_group_or_user_id(link, api_vk):
     try:
-        first = -api_vk.groups.getById(group_id=link, v=5.131)
-    except:
-        first = api_vk.users.get(user_ids=link, v=5.131)
-    return first[0]['id']
+        first = -(api_vk.groups.getById(group_id=link, v=5.131))[0]['id']
+    except Exception:
+        first = (api_vk.users.get(user_ids=link, v=5.131))[0]['id']
+    return first
 
 
 def write_to_csv(data, filename):
-    with open(filename, 'w', newline='') as f:
-        writer = csv.writer(f, delimiter=';')
+    with open(filename, 'w', newline='') as file:
+        writer = csv.writer(file, delimiter=';')
         writer.writerow(["created_at", "u1", "u2", "time_interval"])
-
-        # dictionary to keep track of the count of items for each user pair
-        user_pairs = {}
 
         # loop through each item in the data list
         for item in data:
             if isinstance(item, Comment) or isinstance(item, Post):
                 created_at = datetime.datetime.utcfromtimestamp(item.date)
-                user_pair = tuple(sorted([item.user_id, item.owner_id]))
-
-                # calculate time interval and frequency if there is a previous item for the user pair
-                if user_pair in user_pairs:
-                    writer.writerow(
-                        [created_at.strftime('%Y-%m-%d %H:%M:%S'), user_pair[0], user_pair[1], item.date])
-
-                # update count and previous created_at for the user pair
-                user_pairs[user_pair] = (created_at, user_pairs.get(user_pair, (None, 0))[1] + 1)
+                writer.writerow(
+                    [created_at.strftime('%Y-%m-%d %H:%M:%S'), item.owner_id, item.user_id, item.date])
 
 
 def distribute_lines(filename, time_start, time_slot_length):
@@ -59,11 +59,12 @@ def distribute_lines(filename, time_start, time_slot_length):
 
             u1 = row[1]
             u2 = row[2]
+            u1, u2 = sorted([u1, u2])
             time_interval = int(row[3])
-
-            current_interval = date1_unix
-            while time_interval >= current_interval:
-                current_interval += time_slot_length
+            if (time_interval % time_slot_length) != 0:
+                current_interval = time_interval + time_slot_length - (time_interval % time_slot_length)
+            else:
+                current_interval = time_interval
 
             if (u1, u2, current_interval) not in unique_rows:
                 unique_rows.add((u1, u2, current_interval))
@@ -76,28 +77,50 @@ def distribute_lines(filename, time_start, time_slot_length):
             if u1 != u2:
                 created_at = datetime.datetime.utcfromtimestamp(time_interval)
                 writer.writerow(
-                    [created_at.strftime('%Y-%m-%d %H:%M:%S'), u1, u2, (time_interval - date1_unix) // time_slot_length,
+                    [created_at.strftime('%Y-%m-%d %H:%M:%S'), u1, u2,
+                     (time_interval - date1_unix) // time_slot_length,
                      frequency])
 
     return output_file
 
 
+def get_parent(comments: list, comment: Comment) -> int:
+    parent_content_id = comment.owner_content_id
+    for comment in comments:
+        if comment.content_id == parent_content_id:
+            return comment.user_id
+    return -1
+
+
 if __name__ == "__main__":
     access_token = "0c8512290c8512290c851229580f9745a900c850c8512296f4aca4683b7880e4d7a40d3"  # Service access key
     vk_api = vk.API(access_token=access_token)
-    group_id = get_group_or_user_id("gladkov_vv", vk_api)
-    posts_data = get_posts_by_date(vk_api, group_id,
-                                   datetime.datetime(2023, 4, 20, 12, 29, 0, tzinfo=pytz.timezone('Europe/London')),
-                                   datetime.datetime(2023, 4, 23, 12, 29, 0, tzinfo=pytz.timezone('Europe/London')))
+    groups_ids = get_groups_or_users_id(
+        ["gladkov_vv", "v_v_demidov", "belinter", "belgorod_region", "autobelgorod", "newsbelgorod", "belgorod1",
+         "pervyj_bgd", "belgorod", "beladm31", "fonartv", "mirbelogorya"], vk_api)
+    posts_data = []
+    for group_id in groups_ids:
+        posts_data += get_posts_by_date(vk_api, group_id,
+                                        datetime.datetime(2023, 4, 20, 1, 0, 0,
+                                                          tzinfo=pytz.UTC),
+                                        datetime.datetime(2023, 4, 22, 19, 0, 0,
+                                                          tzinfo=pytz.UTC))
     print("Постов собрано: {}".format(len(posts_data)))
     comments_data = [comment for post in posts_data for comment in
                      get_post_comments_by_date(vk_api, post,
-                                               datetime.datetime(2023, 4, 20, 12, 29, 0,
-                                                                 tzinfo=pytz.timezone('Europe/London')),
-                                               datetime.datetime(2023, 4, 23, 12, 29, 0,
-                                                                 tzinfo=pytz.timezone('Europe/London')))]
+                                               datetime.datetime(2023, 4, 20, 1, 0, 0,
+                                                                 tzinfo=pytz.UTC),
+                                               datetime.datetime(2023, 4, 22, 19, 0, 0,
+                                                                 tzinfo=pytz.UTC))]
+    for comment in comments_data:
+        k = get_parent(comments_data, comment)
+        if k != -1:
+            comment.owner_id = k
     print("Комментариев собрано: {}".format(len(comments_data)))
     posts_data = add_post_comments(posts_data, comments_data)
+    with open('log.txt', 'w', encoding='utf-8') as f:
+        for obj in posts_data:
+            f.write(str(obj) + '\n')
     sorted_data = sorted(posts_data, key=lambda x: x.date)
     write_to_csv(sorted_data, "data.csv")
-    distribute_lines("data.csv", datetime.datetime(2023, 4, 20, 12, 29, 0, tzinfo=pytz.timezone('Europe/London')), 3600)
+    distribute_lines("data.csv", datetime.datetime(2023, 4, 21, 3, 0, 0, tzinfo=pytz.utc), 3600)
