@@ -5,7 +5,7 @@ import time
 import pytz as pytz
 import vk
 
-from comment import Comment, add_post_comments, get_post_comments_by_date
+from comment import Comment, get_post_comments_by_date
 from post import Post, get_posts_by_date
 
 
@@ -84,6 +84,13 @@ def distribute_lines(filename, time_start, time_slot_length):
     return output_file
 
 
+def correct_parents(comments):
+    for comment in comments:
+        k = get_parent(comments, comment)
+        if k != -1:
+            comment.owner_id = k
+
+
 def get_parent(comments: list, comment: Comment) -> int:
     parent_content_id = comment.owner_content_id
     for comment in comments:
@@ -101,26 +108,20 @@ if __name__ == "__main__":
     posts_data = []
     for group_id in groups_ids:
         posts_data += get_posts_by_date(vk_api, group_id,
-                                        datetime.datetime(2023, 4, 20, 1, 0, 0,
+                                        datetime.datetime(2023, 4, 21, 1, 0, 0,
                                                           tzinfo=pytz.UTC),
                                         datetime.datetime(2023, 4, 22, 19, 0, 0,
                                                           tzinfo=pytz.UTC))
     print("Постов собрано: {}".format(len(posts_data)))
     comments_data = [comment for post in posts_data for comment in
                      get_post_comments_by_date(vk_api, post,
-                                               datetime.datetime(2023, 4, 20, 1, 0, 0,
+                                               datetime.datetime(2023, 4, 21, 1, 0, 0,
                                                                  tzinfo=pytz.UTC),
                                                datetime.datetime(2023, 4, 22, 19, 0, 0,
                                                                  tzinfo=pytz.UTC))]
-    for comment in comments_data:
-        k = get_parent(comments_data, comment)
-        if k != -1:
-            comment.owner_id = k
+    correct_parents(comments_data)
     print("Комментариев собрано: {}".format(len(comments_data)))
-    posts_data = add_post_comments(posts_data, comments_data)
-    with open('log.txt', 'w', encoding='utf-8') as f:
-        for obj in posts_data:
-            f.write(str(obj) + '\n')
-    sorted_data = sorted(posts_data, key=lambda x: x.date)
+    raw_data = posts_data + comments_data
+    sorted_data = sorted(raw_data, key=lambda x: x.date)
     write_to_csv(sorted_data, "data.csv")
     distribute_lines("data.csv", datetime.datetime(2023, 4, 21, 3, 0, 0, tzinfo=pytz.utc), 3600)

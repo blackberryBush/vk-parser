@@ -5,7 +5,6 @@ class Comment:
     def __init__(self, data):
         self.raw_data = data
         self.content_id = data.get("id", "-1")
-        self.content_type = "comment"
         self.date = data.get("date", -1)
         if self.date != -1:
             self.date += 3600 * 3
@@ -21,16 +20,11 @@ class Comment:
         if self.owner_content_id == -1:
             self.owner_content_id = data.get("post_id", -1)
         self.user_id = data.get("from_id", -1)
-        likes = data.get("likes", -1)
-        self.likes = likes.get("count") if isinstance(likes, dict) else likes
         thread = data.get("thread", -1)
         self.comments = thread.get("count") if thread != -1 else 0
 
     def __str__(self):
         return str(self.raw_data)
-
-    def __eq__(self, other):
-        return self.content_id == other
 
 
 def get_threads_by_date(vk_api, post, data, date1, date2, last_check=0):
@@ -107,14 +101,4 @@ def get_raw_comment_replies_by_date(vk_api, owner_id, comment_id, date1, date2):
         if need_break:
             break
         print(f"Идёт парсинг {owner_id}, коммент {comment_id}: извлечено {len(comments)} реплаев")
-    return data
-
-
-def add_post_comments(data: list, data_comments: list) -> list:
-    for i in data_comments:
-        try:
-            ind = data.index(i.owner_content_id)
-        except ValueError:
-            ind = -1
-        data.insert(ind + 1, i)
     return data
